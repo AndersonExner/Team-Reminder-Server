@@ -11,6 +11,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AuthDb>((services, options) => options.UseNpgsql(
     services.GetRequiredService<IConfiguration>().GetConnectionString("Database")
     ?? throw new InvalidOperationException("Configure ConnectionStrings__Database.")));
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<PublicPortal>();
+builder.Services.AddHttpClient("releases", client => {
+    client.BaseAddress = new Uri("https://api.github.com/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TeamReminder-Server/1.0");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<PasswordHasherOptions>(o => o.IterationCount = 210_000);
 builder.Services.AddSingleton<IPasswordHasher<Account>, PasswordHasher<Account>>();
@@ -46,6 +53,8 @@ app.Use(async (context, next) =>
         context.Response.Headers.CacheControl = "no-store";
     await next(context);
 });
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
@@ -116,6 +125,16 @@ auth.MapPost("/logout", async (ClaimsPrincipal principal, AuthDb db, Cancellatio
     await db.Sessions.Where(x => x.Id == id).ExecuteDeleteAsync(ct);
     return Results.NoContent();
 }).RequireAuthorization();
+app.MapGet("/api/public/statistics", async (PublicPortal portal, CancellationToken ct) =>
+    Results.Ok(await portal.StatisticsAsync(ct)));
+app.MapGet("/api/public/release", async (PublicPortal portal, CancellationToken ct) => {
+    var release = await portal.ReleaseAsync(ct);
+    return release is null ? Results.NotFound(new { message = "Nenhum instalador publicado." }) : Results.Ok(release);
+});
+app.MapGet("/download/windows", async (PublicPortal portal, CancellationToken ct) => {
+    var release = await portal.ReleaseAsync(ct);
+    return release is null ? Results.NotFound(new { message = "Download em breve." }) : Results.Redirect(release.DownloadUrl);
+});
 app.MapPersonalAlarms();
 app.MapGroups();
 app.Run();
