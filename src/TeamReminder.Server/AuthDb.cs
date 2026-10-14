@@ -29,9 +29,41 @@ public sealed class AuthDb(DbContextOptions<AuthDb> options) : DbContext(options
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<LoginSession> Sessions => Set<LoginSession>();
     public DbSet<PersonalAlarm> PersonalAlarms => Set<PersonalAlarm>();
+    public DbSet<TeamGroup> Groups => Set<TeamGroup>();
+    public DbSet<GroupMembership> GroupMemberships => Set<GroupMembership>();
+    public DbSet<GroupInvitation> GroupInvitations => Set<GroupInvitation>();
+    public DbSet<GroupAuditEvent> GroupAuditEvents => Set<GroupAuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<TeamGroup>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.OwnerAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<GroupMembership>(e =>
+        {
+            e.HasKey(x => new { x.GroupId, x.AccountId });
+            e.HasIndex(x => x.AccountId);
+            e.HasOne<TeamGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
+        });
+        model.Entity<GroupInvitation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.GroupId, x.RecipientAccountId, x.Status });
+            e.HasIndex(x => new { x.RecipientAccountId, x.Status });
+            e.HasOne<TeamGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.RecipientAccountId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.InviterAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+        model.Entity<GroupAuditEvent>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.GroupId, x.CreatedAt });
+            e.HasOne<TeamGroup>().WithMany().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<PersonalAlarm>(e =>
         {
             e.HasKey(x => new { x.AccountId, x.Id });

@@ -21,6 +21,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddPolicy("groups", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("Groups:RequestsPerMinute") ?? 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
     o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("Auth:RequestsPerMinute") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
@@ -43,8 +46,8 @@ app.Use(async (context, next) =>
         context.Response.Headers.CacheControl = "no-store";
     await next(context);
 });
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapGet("/health/ready", async (AuthDb db, CancellationToken ct) =>
@@ -114,6 +117,7 @@ auth.MapPost("/logout", async (ClaimsPrincipal principal, AuthDb db, Cancellatio
     return Results.NoContent();
 }).RequireAuthorization();
 app.MapPersonalAlarms();
+app.MapGroups();
 app.Run();
 
 public partial class Program { }
