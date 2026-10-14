@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: team-reminder-api
+    runtime: docker
+    repo: https://github.com/AndersonExner/Team-Reminder-Server
+    branch: main
+    plan: free
+    region: ohio
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_HTTP_PORTS
+        value: 10000
+      - key: ConnectionStrings__Database
+        sync: false
