@@ -9,6 +9,7 @@ public sealed class Account
     public string Email { get; set; } = "";
     public string NormalizedEmail { get; set; } = "";
     public string PasswordHash { get; set; } = "";
+    public long AlarmRevision { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -27,9 +28,16 @@ public sealed class AuthDb(DbContextOptions<AuthDb> options) : DbContext(options
 {
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<LoginSession> Sessions => Set<LoginSession>();
+    public DbSet<PersonalAlarm> PersonalAlarms => Set<PersonalAlarm>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<PersonalAlarm>(e =>
+        {
+            e.HasKey(x => new { x.AccountId, x.Id });
+            e.HasIndex(x => new { x.AccountId, x.Version }).IsUnique();
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
+        });
         model.Entity<Account>(e =>
         {
             e.HasKey(x => x.Id);
