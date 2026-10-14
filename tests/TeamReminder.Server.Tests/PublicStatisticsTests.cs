@@ -30,7 +30,7 @@ public sealed class PublicStatisticsTests(ApiFactory factory) : IClassFixture<Ap
         var totals = (await response.Content.ReadFromJsonAsync<PublicStatistics>())!;
         Assert.Equal(await db.Accounts.LongCountAsync(x=>x.DeletedAt==null), totals.Accounts);
         Assert.Equal(await db.Groups.LongCountAsync(x => x.DeletedAt == null && x.IsActive), totals.Groups);
-        Assert.Equal(await db.PersonalAlarms.LongCountAsync(x => !x.Deleted), totals.Alarms);
+        Assert.Equal(await db.PersonalAlarms.LongCountAsync(x => !x.Deleted)+await db.GroupAlarms.LongCountAsync(x=>!x.Deleted&&db.Groups.Any(g=>g.Id==x.GroupId&&g.DeletedAt==null)), totals.Alarms);
         var page = await client.GetStringAsync("/");
         Assert.Contains("Baixar para Windows", page);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/portal.js")).StatusCode);
