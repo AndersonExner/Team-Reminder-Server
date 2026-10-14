@@ -68,6 +68,21 @@ public static class SchemaMigration
                 CREATE INDEX "IX_GroupAuditEvents_GroupId_CreatedAt" ON "GroupAuditEvents" ("GroupId", "CreatedAt");
                 INSERT INTO schema_versions (version) VALUES (3);
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM schema_versions WHERE version = 4) THEN
+                ALTER TABLE "Accounts" ADD COLUMN "IsActive" boolean NOT NULL DEFAULT true,
+                    ADD COLUMN "IsSystemAdmin" boolean NOT NULL DEFAULT false,
+                    ADD COLUMN "DeletedAt" timestamptz,
+                    ADD COLUMN "Revision" bigint NOT NULL DEFAULT 1,
+                    ADD COLUMN "SessionVersion" bigint NOT NULL DEFAULT 0;
+                ALTER TABLE "Sessions" ADD COLUMN "AccountVersion" bigint NOT NULL DEFAULT 0;
+                ALTER TABLE "Groups" ADD COLUMN "IsActive" boolean NOT NULL DEFAULT true;
+                CREATE TABLE "AdminAuditEvents" (
+                    "Id" uuid PRIMARY KEY, "ActorAccountId" uuid NOT NULL REFERENCES "Accounts" ("Id"),
+                    "TargetId" uuid NOT NULL, "Entity" text NOT NULL, "Action" text NOT NULL,
+                    "CreatedAt" timestamptz NOT NULL);
+                CREATE INDEX "IX_AdminAuditEvents_CreatedAt" ON "AdminAuditEvents" ("CreatedAt");
+                INSERT INTO schema_versions (version) VALUES (4);
+            END IF;
             END $$;
             """, connection, transaction);
         await command.ExecuteNonQueryAsync();

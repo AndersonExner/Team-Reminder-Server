@@ -18,8 +18,8 @@ public sealed class PublicPortal(IMemoryCache cache, IServiceScopeFactory scopes
             if (cache.TryGetValue<PublicStatistics>("stats", out cached)) return cached!;
             using var scope = scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AuthDb>();
-            var result = new PublicStatistics(await db.Accounts.LongCountAsync(ct),
-                await db.Groups.LongCountAsync(x => x.DeletedAt == null, ct),
+            var result = new PublicStatistics(await db.Accounts.LongCountAsync(x => x.DeletedAt == null, ct),
+                await db.Groups.LongCountAsync(x => x.DeletedAt == null && x.IsActive, ct),
                 await db.PersonalAlarms.LongCountAsync(x => !x.Deleted, ct), DateTimeOffset.UtcNow);
             cache.Set("stats", result, TimeSpan.FromSeconds(60));
             return result;

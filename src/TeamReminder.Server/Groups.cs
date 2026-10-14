@@ -11,6 +11,7 @@ public sealed class TeamGroup
     public Guid OwnerAccountId { get; set; }
     public long Revision { get; set; } = 1;
     public DateTimeOffset CreatedAt { get; set; }
+    public bool IsActive { get; set; } = true;
     public DateTimeOffset? DeletedAt { get; set; }
 }
 public sealed class GroupMembership

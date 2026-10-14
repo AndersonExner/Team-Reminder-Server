@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administração · Team Reminder</title><link rel="stylesheet" href="/admin/admin.css"><script src="/admin/admin.js" defer></script></head>
+<body><main><header><a href="/">◷ Team Reminder</a><span>Administração do sistema</span><button id="logout" hidden>Sair</button></header>
+<p id="message" role="status" aria-live="polite"></p>
+<section id="login"><h1>Acesso administrativo</h1><p>Entre com uma conta administradora do sistema.</p>
+<form id="login-form"><label>E-mail<input id="login-email" type="email" autocomplete="username" required maxlength="254"></label><label>Senha<input id="login-password" type="password" autocomplete="current-password" required maxlength="128"></label><button>Entrar</button></form></section>
+<section id="panel" hidden><h1>Visão geral</h1><div id="summary" class="summary"></div>
+<nav><button data-tab="users">Usuários</button><button data-tab="groups">Grupos</button><button data-tab="audit">Auditoria</button></nav>
+<div class="toolbar"><input id="search" aria-label="Buscar por nome ou e-mail" placeholder="Buscar por nome ou e-mail" maxlength="254"><select id="status" aria-label="Filtrar situação"><option value="">Todos</option><option value="active">Ativos</option><option value="inactive">Desativados</option><option value="deleted">Excluídos</option></select><button id="filter">Buscar</button><button id="create">Novo usuário</button></div>
+<div class="table-wrap"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
+<div class="pagination"><button id="previous">Anterior</button><span id="pagination"></span><button id="next">Próxima</button></div>
+</section>
+<dialog id="editor"><form id="edit-form"><h2 id="edit-title"></h2><label>Nome<input id="name" required maxlength="100"></label>
+<div id="user-fields"><label>E-mail<input id="email" type="email" maxlength="254"></label><label>Senha <small>Deixe em branco para manter a atual</small><input id="password" type="password" autocomplete="new-password" minlength="10" maxlength="128"></label><label class="check"><input id="system-admin" type="checkbox">Administrador do sistema</label></div>
+<div id="group-fields"><label>Descrição<textarea id="description" maxlength="500"></textarea></label><label>E-mail do proprietário<input id="owner" type="email" placeholder="usuario@exemplo.com"></label></div>
+<label class="check"><input id="active" type="checkbox">Ativo</label><p class="detail">Desativar bloqueia o acesso. Alterações de senha ou permissão encerram as sessões. As notificações já salvas no computador continuam locais.</p>
+<div class="actions"><button type="button" id="cancel-edit">Cancelar</button><button id="save">Salvar</button></div><p id="edit-error" role="alert"></p></form></dialog>
+<dialog id="details"><h2>Detalhes</h2><div id="detail-content"></div><button id="close-details">Fechar</button></dialog>
+<footer>Exclusão lógica preserva o histórico. Registros restaurados voltam desativados. As ações administrativas são auditadas.</footer>
+</main></body></html>

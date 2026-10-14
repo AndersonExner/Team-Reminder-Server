@@ -18,12 +18,13 @@ public sealed class SessionAuthentication(IOptionsMonitor<AuthenticationSchemeOp
         if (token.Length != 64) return AuthenticateResult.Fail("Sessão inválida.");
         var hash = AuthTokens.Hash(token);
         var now = clock.GetUtcNow();
-        var session = await db.Sessions.AsNoTracking().SingleOrDefaultAsync(
-            x => x.AccessHash == hash && x.AccessExpiresAt > now && x.RefreshExpiresAt > now, Context.RequestAborted);
+        var session = await db.Sessions.AsNoTracking().Include(x => x.Account).SingleOrDefaultAsync(
+            x => x.Account.IsActive && x.Account.DeletedAt == null && x.AccountVersion == x.Account.SessionVersion && x.AccessHash == hash && x.AccessExpiresAt > now && x.RefreshExpiresAt > now, Context.RequestAborted);
         if (session is null) return AuthenticateResult.Fail("Sessão expirada ou inválida.");
         var identity = new ClaimsIdentity([
             new Claim(ClaimTypes.NameIdentifier, session.AccountId.ToString()),
-            new Claim("session_id", session.Id.ToString())], Scheme.Name);
+            new Claim("session_id", session.Id.ToString()),
+            new Claim("system_admin", session.Account.IsSystemAdmin ? "true" : "false")], Scheme.Name);
         return AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name));
     }
 }

@@ -10,6 +10,11 @@ public sealed class Account
     public string NormalizedEmail { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public long AlarmRevision { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsSystemAdmin { get; set; }
+    public DateTimeOffset? DeletedAt { get; set; }
+    public long Revision { get; set; } = 1;
+    public long SessionVersion { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
@@ -18,6 +23,7 @@ public sealed class LoginSession
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid AccountId { get; set; }
     public Account Account { get; set; } = null!;
+    public long AccountVersion { get; set; }
     public string AccessHash { get; set; } = "";
     public string RefreshHash { get; set; } = "";
     public DateTimeOffset AccessExpiresAt { get; set; }
@@ -26,6 +32,7 @@ public sealed class LoginSession
 
 public sealed class AuthDb(DbContextOptions<AuthDb> options) : DbContext(options)
 {
+    public DbSet<AdminAuditEvent> AdminAuditEvents => Set<AdminAuditEvent>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<LoginSession> Sessions => Set<LoginSession>();
     public DbSet<PersonalAlarm> PersonalAlarms => Set<PersonalAlarm>();
@@ -36,6 +43,12 @@ public sealed class AuthDb(DbContextOptions<AuthDb> options) : DbContext(options
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<AdminAuditEvent>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<TeamGroup>(e =>
         {
             e.HasKey(x => x.Id);
