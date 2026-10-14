@@ -21,6 +21,7 @@ public static class AuthTokens
         now = new DateTimeOffset(now.Ticks - now.Ticks % 10, now.Offset);
         var access = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         var refresh = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        session.AccountVersion = session.Account.SessionVersion;
         session.AccessHash = Hash(access);
         session.RefreshHash = Hash(refresh);
         session.AccessExpiresAt = now.AddMinutes(15);

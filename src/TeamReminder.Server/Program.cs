@@ -23,7 +23,7 @@ builder.Services.Configure<PasswordHasherOptions>(o => o.IterationCount = 210_00
 builder.Services.AddSingleton<IPasswordHasher<Account>, PasswordHasher<Account>>();
 builder.Services.AddSingleton<DummyPassword>();
 builder.Services.AddAuthentication("Session").AddScheme<AuthenticationSchemeOptions, SessionAuthentication>("Session", _ => { });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(o => o.AddPolicy("SystemAdmin", p => p.RequireAuthenticatedUser().RequireClaim("system_admin", "true")));
 builder.Services.AddProblemDetails();
 builder.Services.AddRateLimiter(o =>
 {
@@ -46,9 +46,22 @@ if (args.Contains("--migrate"))
     return;
 }
 
+if (args.Contains("--bootstrap-admin"))
+{
+    await AdminBootstrap.RunAsync(app.Services);
+    return;
+}
+
 app.UseExceptionHandler();
 app.Use(async (context, next) =>
 {
+    if (context.Request.Path.StartsWithSegments("/admin"))
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    }
     if (context.Request.Path.StartsWithSegments("/api"))
         context.Response.Headers.CacheControl = "no-store";
     await next(context);
@@ -92,7 +105,7 @@ auth.MapPost("/login", async (LoginRequest request, AuthDb db, IPasswordHasher<A
     var normalized = request.Email!.Trim().ToUpperInvariant();
     var account = await db.Accounts.SingleOrDefaultAsync(x => x.NormalizedEmail == normalized, ct);
     var result = hasher.VerifyHashedPassword(account ?? dummy.Account, account?.PasswordHash ?? dummy.Hash, request.Password);
-    if (account is null || result == PasswordVerificationResult.Failed) return Results.Unauthorized();
+    if (account is null || !account.IsActive || account.DeletedAt != null || result == PasswordVerificationResult.Failed) return Results.Unauthorized();
     if (result == PasswordVerificationResult.SuccessRehashNeeded)
         account.PasswordHash = hasher.HashPassword(account, request.Password);
     var session = new LoginSession { Account = account };
@@ -107,7 +120,7 @@ auth.MapPost("/refresh", async (RefreshRequest request, AuthDb db, TimeProvider 
     var hash = AuthTokens.Hash(request.RefreshToken);
     var now = clock.GetUtcNow();
     var session = await db.Sessions.Include(x => x.Account).SingleOrDefaultAsync(
-        x => x.RefreshHash == hash && x.RefreshExpiresAt > now, ct);
+        x => x.Account.IsActive && x.Account.DeletedAt == null && x.AccountVersion == x.Account.SessionVersion && x.RefreshHash == hash && x.RefreshExpiresAt > now, ct);
     if (session is null) return Results.Unauthorized();
     var response = AuthTokens.Rotate(session, now, false);
     try { await db.SaveChangesAsync(ct); }
@@ -135,6 +148,7 @@ app.MapGet("/download/windows", async (PublicPortal portal, CancellationToken ct
     var release = await portal.ReleaseAsync(ct);
     return release is null ? Results.NotFound(new { message = "Download em breve." }) : Results.Redirect(release.DownloadUrl);
 });
+app.MapAdministration();
 app.MapPersonalAlarms();
 app.MapGroups();
 app.Run();

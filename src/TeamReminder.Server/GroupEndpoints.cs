@@ -27,7 +27,7 @@ public static class GroupEndpoints
         {
             var actor = Actor(principal);
             var rows = await (from member in db.GroupMemberships join team in db.Groups on member.GroupId equals team.Id
-                where member.AccountId == actor && team.DeletedAt == null orderby team.Name
+                where member.AccountId == actor && team.DeletedAt == null && team.IsActive orderby team.Name
                 select new { Group = team, member.Role, Count = db.GroupMemberships.Count(x => x.GroupId == team.Id) }).ToListAsync(ct);
             return Results.Ok(rows.Select(x => Summary(x.Group, x.Role, x.Count)));
         });
@@ -38,6 +38,7 @@ public static class GroupEndpoints
             var actor = Actor(principal);
             await using var tx = await db.Database.BeginTransactionAsync(ct);
             await db.Accounts.FromSqlInterpolated($"SELECT * FROM \"Accounts\" WHERE \"Id\" = {actor} FOR NO KEY UPDATE").ToListAsync(ct);
+            if (!await db.Accounts.AnyAsync(x=>x.Id==actor&&x.IsActive&&x.DeletedAt==null,ct)) return Results.Unauthorized();
             if (await db.Groups.CountAsync(x => x.OwnerAccountId == actor && x.DeletedAt == null, ct) >= 20)
                 return Message(422, "Você pode ser proprietário de até 20 grupos.");
             if (await MembershipCount(db, actor, ct) >= 100) return Message(422, "Você pode participar de até 100 grupos.");
@@ -87,6 +88,7 @@ public static class GroupEndpoints
                 var next = await db.GroupMemberships.SingleOrDefaultAsync(x => x.GroupId == id && x.AccountId == request.AccountId, ct);
                 if (next is null) return Results.NotFound();
                 await db.Accounts.FromSqlInterpolated($"SELECT * FROM \"Accounts\" WHERE \"Id\" = {request.AccountId} FOR NO KEY UPDATE").ToListAsync(ct);
+                if(!await db.Accounts.AnyAsync(x=>x.Id==request.AccountId&&x.IsActive&&x.DeletedAt==null,ct)) return Message(409,"O novo proprietário está desativado.");
                 if (await db.Groups.CountAsync(x => x.OwnerAccountId == request.AccountId && x.DeletedAt == null, ct) >= 20)
                     return Message(422, "O participante já é proprietário de 20 grupos.");
                 var previous = await db.GroupMemberships.SingleAsync(x => x.GroupId == id && x.AccountId == actor, ct);
@@ -124,11 +126,13 @@ public static class GroupEndpoints
                 if (role == GroupRole.Member) return Results.Forbid();
                 if (!RegistrationValidation.ValidEmail(request.Email)) return Message(400, "Informe um e-mail válido.");
                 var normalized = request.Email!.Trim().ToUpperInvariant();
-                var recipient = await db.Accounts.SingleOrDefaultAsync(x => x.NormalizedEmail == normalized, ct);
+                var recipient = await db.Accounts.SingleOrDefaultAsync(x => x.NormalizedEmail == normalized && x.IsActive && x.DeletedAt == null, ct);
                 if (recipient is null) return Message(404, "Não foi possível convidar: o e-mail deve ter uma conta cadastrada.");
                 if (await db.GroupMemberships.AnyAsync(x => x.GroupId == id && x.AccountId == recipient.Id, ct)) return Message(409, "Esta pessoa já participa do grupo.");
                 await db.Accounts.FromSqlInterpolated($"SELECT * FROM \"Accounts\" WHERE \"Id\" = {recipient.Id} FOR NO KEY UPDATE").ToListAsync(ct);
                 var now = clock.GetUtcNow();
+                await db.Entry(recipient).ReloadAsync(ct);
+                if(!recipient.IsActive||recipient.DeletedAt!=null)return Message(409,"A conta está desativada.");
                 if (await db.GroupInvitations.CountAsync(x => x.RecipientAccountId == recipient.Id && x.Status == InvitationStatus.Pending && x.ExpiresAt > now, ct) >= 100)
                     return Message(422, "Esta pessoa já tem 100 convites pendentes.");
                 if (await db.GroupInvitations.AnyAsync(x => x.GroupId == id && x.RecipientAccountId == recipient.Id && x.Status == InvitationStatus.Pending && x.ExpiresAt > now, ct))
@@ -174,17 +178,17 @@ public static class GroupEndpoints
         (from invite in db.GroupInvitations join team in db.Groups on invite.GroupId equals team.Id
         join recipient in db.Accounts on invite.RecipientAccountId equals recipient.Id
         join inviter in db.Accounts on invite.InviterAccountId equals inviter.Id
-        where team.DeletedAt == null && invite.Status == InvitationStatus.Pending && invite.ExpiresAt > now
+        where team.DeletedAt == null && team.IsActive && invite.Status == InvitationStatus.Pending && invite.ExpiresAt > now
             && (groupId == null || invite.GroupId == groupId) && (recipientId == null || invite.RecipientAccountId == recipientId)
         orderby invite.ExpiresAt
         select new GroupInvitationResponse(invite.Id, team.Id, team.Name, recipient.Email, inviter.Name, invite.ExpiresAt, "Pending")).ToListAsync(ct);
 
     private static Task<GroupMembership?> FindMember(AuthDb db, Guid id, Guid actor, CancellationToken ct) =>
         (from member in db.GroupMemberships join team in db.Groups on member.GroupId equals team.Id
-         where member.GroupId == id && member.AccountId == actor && team.DeletedAt == null select member).SingleOrDefaultAsync(ct);
+         where member.GroupId == id && member.AccountId == actor && team.DeletedAt == null && team.IsActive select member).SingleOrDefaultAsync(ct);
     private static Task<int> MembershipCount(AuthDb db, Guid actor, CancellationToken ct) =>
         (from member in db.GroupMemberships join team in db.Groups on member.GroupId equals team.Id
-         where member.AccountId == actor && team.DeletedAt == null select member).CountAsync(ct);
+         where member.AccountId == actor && team.DeletedAt == null && team.IsActive select member).CountAsync(ct);
 
     private static async Task<IResult> DetailsAsync(Guid id, ClaimsPrincipal principal, AuthDb db, TimeProvider clock, CancellationToken ct)
     {
@@ -205,7 +209,7 @@ public static class GroupEndpoints
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var rows = await db.Groups.FromSqlInterpolated($"SELECT * FROM \"Groups\" WHERE \"Id\" = {id} FOR UPDATE").ToListAsync(ct);
         var team = rows.SingleOrDefault();
-        if (team is null || team.DeletedAt is not null) return Results.NotFound();
+        if (team is null || team.DeletedAt is not null || !team.IsActive) return Results.NotFound();
         var member = await db.GroupMemberships.SingleOrDefaultAsync(x => x.GroupId == id && x.AccountId == actor, ct);
         if (member is null) return Results.NotFound();
         if (revision != team.Revision) return Message(409, "O grupo mudou. Atualize a lista e tente novamente.");
@@ -228,7 +232,7 @@ public static class GroupEndpoints
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var rows = await db.Groups.FromSqlInterpolated($"SELECT * FROM \"Groups\" WHERE \"Id\" = {lookup.GroupId} FOR UPDATE").ToListAsync(ct);
         var team = rows.SingleOrDefault();
-        if (team is null || team.DeletedAt is not null) return Results.NotFound();
+        if (team is null || team.DeletedAt is not null || !team.IsActive) return Results.NotFound();
         var invite = await db.GroupInvitations.SingleAsync(x => x.Id == id, ct);
         var exists = await db.GroupMemberships.AnyAsync(x => x.GroupId == team.Id && x.AccountId == actor, ct);
         if ((accept && invite.Status == InvitationStatus.Accepted && exists) || (!accept && invite.Status == InvitationStatus.Declined)) return Results.NoContent();
@@ -238,6 +242,9 @@ public static class GroupEndpoints
         if (accept)
         {
             await db.Accounts.FromSqlInterpolated($"SELECT * FROM \"Accounts\" WHERE \"Id\" = {actor} FOR NO KEY UPDATE").ToListAsync(ct);
+            if(!await db.Accounts.AnyAsync(x=>x.Id==actor&&x.IsActive&&x.DeletedAt==null,ct))return Results.Unauthorized();
+            await db.Entry(invite).ReloadAsync(ct);
+            if(invite.Status!=InvitationStatus.Pending)return Message(409,"Este convite não está mais pendente.");
             if (await db.GroupMemberships.CountAsync(x => x.GroupId == team.Id, ct) >= 100) return Message(422, "O grupo atingiu 100 participantes.");
             if (await MembershipCount(db, actor, ct) >= 100) return Message(422, "Você atingiu 100 grupos.");
             if (!exists) db.GroupMemberships.Add(new() { GroupId = team.Id, AccountId = actor, Role = GroupRole.Member, JoinedAt = now });
