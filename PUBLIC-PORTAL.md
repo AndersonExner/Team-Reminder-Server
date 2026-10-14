@@ -18,3 +18,5 @@ O workflow Windows release gera o instalador e cria uma release pública. Para c
 O pacote inclui .NET e Windows App SDK. O instalador é por usuário e dispensa privilégios de administrador. Não há assinatura digital de distribuição configurada.
 
 Após integrar as alterações do servidor na main, o Render faz o deploy automático da página. Não é preciso alterar o banco.
+
+As releases incluem release.json com versão, data e endereço do instalador. O servidor lê esse asset público pela URL releases/latest/download/release.json, evitando limites da API anônima do GitHub em IPs compartilhados.

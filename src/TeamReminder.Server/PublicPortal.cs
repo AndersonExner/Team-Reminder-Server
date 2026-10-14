@@ -31,7 +31,7 @@ public sealed class PublicPortal(IMemoryCache cache, IServiceScopeFactory scopes
         await releaseGate.WaitAsync(ct);
         try {
             if (cache.TryGetValue<ReleaseCache>("release", out cached)) return cached!.Release;
-            using var response = await clients.CreateClient("releases").GetAsync("repos/AndersonExner/Team-Reminder-Client/releases/latest", ct);
+            using var response = await clients.CreateClient("releases").GetAsync("https://github.com/AndersonExner/Team-Reminder-Client/releases/latest/download/release.json", ct);
             DesktopRelease? release = null;
             if (response.StatusCode != HttpStatusCode.NotFound) {
                 response.EnsureSuccessStatusCode();
