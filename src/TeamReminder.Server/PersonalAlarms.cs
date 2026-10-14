@@ -74,10 +74,12 @@ public static class PersonalAlarmEndpoints
         var errors = Validate(id, request);
         if (errors.Count != 0) return Results.ValidationProblem(errors);
         var owner = Owner(principal);
+        if(await db.GroupAlarms.AnyAsync(x=>x.Id==id,ct))return Results.Conflict(new{message="Este identificador pertence a um alarme de grupo. Use a rota do grupo."});
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         // Each account has its own monotonic revision and serializes its writes.
         var accounts = await db.Accounts.FromSqlInterpolated($"SELECT * FROM \"Accounts\" WHERE \"Id\" = {owner} FOR UPDATE").ToListAsync(ct);
         var account = accounts.Single();
+        if(!account.IsActive||account.DeletedAt!=null)return Results.Unauthorized();
         var row = await db.PersonalAlarms.SingleOrDefaultAsync(x => x.AccountId == owner && x.Id == id, ct);
         if (row is not null && row.MutationId == request.MutationId)
             return Results.Ok(row.ToChange());

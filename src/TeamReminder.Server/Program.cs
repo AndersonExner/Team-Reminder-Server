@@ -151,6 +151,7 @@ app.MapGet("/download/windows", async (PublicPortal portal, CancellationToken ct
 app.MapAdministration();
 app.MapPersonalAlarms();
 app.MapGroups();
+app.MapGroupAlarms();
 app.Run();
 
 public partial class Program { }

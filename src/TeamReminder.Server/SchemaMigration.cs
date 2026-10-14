@@ -83,6 +83,15 @@ public static class SchemaMigration
                 CREATE INDEX "IX_AdminAuditEvents_CreatedAt" ON "AdminAuditEvents" ("CreatedAt");
                 INSERT INTO schema_versions (version) VALUES (4);
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM schema_versions WHERE version = 5) THEN
+                CREATE TABLE "GroupAlarms" (
+                    "Id" uuid PRIMARY KEY, "GroupId" uuid NOT NULL REFERENCES "Groups" ("Id") ON DELETE RESTRICT,
+                    "CreatedByAccountId" uuid NOT NULL REFERENCES "Accounts" ("Id") ON DELETE RESTRICT,
+                    "Version" bigint NOT NULL, "MutationId" uuid NOT NULL, "Deleted" boolean NOT NULL,
+                    "DefinitionJson" text NOT NULL);
+                CREATE INDEX "IX_GroupAlarms_GroupId" ON "GroupAlarms" ("GroupId");
+                INSERT INTO schema_versions(version) VALUES (5);
+            END IF;
             END $$;
             """, connection, transaction);
         await command.ExecuteNonQueryAsync();

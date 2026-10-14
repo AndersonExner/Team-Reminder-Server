@@ -45,7 +45,7 @@ public static class AdminEndpoints
             activeUsers=await db.Accounts.CountAsync(x=>x.DeletedAt==null&&x.IsActive,ct),
             groups=await db.Groups.CountAsync(x=>x.DeletedAt==null,ct),
             activeGroups=await db.Groups.CountAsync(x=>x.DeletedAt==null&&x.IsActive,ct),
-            alarms=await db.PersonalAlarms.CountAsync(x=>!x.Deleted,ct),
+            alarms=await db.PersonalAlarms.CountAsync(x=>!x.Deleted,ct)+await db.GroupAlarms.CountAsync(x=>!x.Deleted&&db.Groups.Any(g=>g.Id==x.GroupId&&g.DeletedAt==null),ct),
             pendingInvitations=await db.GroupInvitations.CountAsync(x=>x.Status==InvitationStatus.Pending&&x.ExpiresAt>DateTimeOffset.UtcNow,ct)
         }));
         api.MapGet("/users", async (int? page,string? q,string? status,AuthDb db,CancellationToken ct) => {
@@ -135,7 +135,8 @@ public static class AdminEndpoints
                 select new {a.Id,a.Name,a.Email,a.IsActive,m.Role}).Take(100).ToListAsync(ct);
             var invites=await db.GroupInvitations.Where(x=>x.GroupId==id).OrderByDescending(x=>x.CreatedAt)
                 .Select(x=>new{x.Id,x.RecipientAccountId,x.Status,x.ExpiresAt}).Take(100).ToListAsync(ct);
-            return Results.Ok(new{group=Group(g),members,invitations=invites});
+            var alarms=await db.GroupAlarms.AsNoTracking().Where(x=>x.GroupId==id&&!x.Deleted).OrderBy(x=>x.Id).Take(100).ToListAsync(ct);
+            return Results.Ok(new{group=Group(g),members,invitations=invites,alarms=alarms.Select(x=>x.Response(g.Name,false))});
         });
         api.MapPost("/groups",async(AdminGroupRequest r,ClaimsPrincipal p,AuthDb db,CancellationToken ct)=>{
             if(!ValidGroup(r))return Error(400,"Informe nome de até 100 caracteres e descrição de até 500.");

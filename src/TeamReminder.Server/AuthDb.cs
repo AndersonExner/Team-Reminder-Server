@@ -32,6 +32,7 @@ public sealed class LoginSession
 
 public sealed class AuthDb(DbContextOptions<AuthDb> options) : DbContext(options)
 {
+    public DbSet<GroupAlarm> GroupAlarms => Set<GroupAlarm>();
     public DbSet<AdminAuditEvent> AdminAuditEvents => Set<AdminAuditEvent>();
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<LoginSession> Sessions => Set<LoginSession>();
@@ -43,6 +44,12 @@ public sealed class AuthDb(DbContextOptions<AuthDb> options) : DbContext(options
 
     protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<GroupAlarm>(e=>{
+            e.HasKey(x=>x.Id);
+            e.HasIndex(x=>x.GroupId);
+            e.HasOne<TeamGroup>().WithMany().HasForeignKey(x=>x.GroupId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Account>().WithMany().HasForeignKey(x=>x.CreatedByAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<AdminAuditEvent>(e =>
         {
             e.HasKey(x => x.Id);
