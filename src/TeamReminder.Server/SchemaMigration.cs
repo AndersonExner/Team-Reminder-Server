@@ -29,6 +29,19 @@ public static class SchemaMigration
                 CREATE INDEX "IX_Sessions_AccountId" ON "Sessions" ("AccountId");
                 INSERT INTO schema_versions (version) VALUES (1);
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM schema_versions WHERE version = 2) THEN
+                ALTER TABLE "Accounts" ADD COLUMN "AlarmRevision" bigint NOT NULL DEFAULT 0;
+                CREATE TABLE "PersonalAlarms" (
+                    "AccountId" uuid NOT NULL REFERENCES "Accounts" ("Id") ON DELETE CASCADE,
+                    "Id" uuid NOT NULL, "Version" bigint NOT NULL, "MutationId" uuid NOT NULL,
+                    "Deleted" boolean NOT NULL, "Title" text NOT NULL,
+                    "ScheduledAtUtc" timestamptz NOT NULL, "CreatedAtUtc" timestamptz NOT NULL,
+                    "TimeZoneId" text NOT NULL, "Recurrence" integer NOT NULL, "Days" integer NOT NULL,
+                    "LinkUrl" text, "LinkLabel" text, "SoundKind" integer NOT NULL,
+                    PRIMARY KEY ("AccountId", "Id"));
+                CREATE UNIQUE INDEX "IX_PersonalAlarms_AccountId_Version" ON "PersonalAlarms" ("AccountId", "Version");
+                INSERT INTO schema_versions (version) VALUES (2);
+            END IF;
             END $$;
             """, connection, transaction);
         await command.ExecuteNonQueryAsync();

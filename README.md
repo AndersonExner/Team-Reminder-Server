@@ -1,6 +1,6 @@
 # Team Reminder Server
 
-API ASP.NET Core (.NET 10) com PostgreSQL. Autenticação e contas são responsabilidade do servidor; os alarmes e as notificações continuam locais. Sincronização de alarmes fica para uma próxima etapa.
+API ASP.NET Core (.NET 10) com PostgreSQL para autenticação e persistência dos alarmes pessoais. O aplicativo sincroniza os alarmes com seu cache e dispara as notificações localmente. Grupos e organizações ficam para uma próxima etapa.
 
 ## Desenvolvimento com Docker
 
@@ -50,4 +50,47 @@ dotnet test TeamReminder.Server.slnx
 docker rm -f teamreminder-auth-tests
 ```
 
-Os testes verificam cadastro, hashes persistidos, duplicidade, validação, login, autorização, rotação, concorrência, expiração e logout. Não aponte `TEAMREMINDER_TEST_DATABASE` para produção.
+Os testes verificam cadastro, hashes persistidos, duplicidade, validação, login, autorização, rotação, concorrência, expiração e logout, além de persistência de alarmes, isolamento entre contas, sincronização incremental, repetição de operações, conflitos, exclusão e concorrência. Não aponte `TEAMREMINDER_TEST_DATABASE` para produção.
+
+## Alarmes pessoais e sincronização
+
+Todos os endpoints abaixo exigem `Authorization: Bearer <accessToken>`. A conta é extraída da sessão autenticada; o cliente não escolhe o proprietário.
+
+| Método | Caminho | Comportamento |
+|---|---|---|
+| GET | `/api/alarms` | Lista os alarmes ativos da conta |
+| GET | `/api/alarms/{id}` | Consulta um alarme ativo; 404 se não pertence à conta ou foi excluído |
+| PUT | `/api/alarms/{id}` | Cria com versão zero ou atualiza usando a versão atual |
+| DELETE | `/api/alarms/{id}?version=...&mutationId=...` | Registra uma exclusão versionada |
+| GET | `/api/sync?since=0` | Retorna as alterações desde o cursor, incluindo exclusões |
+
+Exemplo de corpo de PUT:
+
+```json
+{
+  "expectedVersion": 0,
+  "mutationId": "a9f786e8-7d36-4a1c-87bf-8051fc3b65b0",
+  "deleted": false,
+  "alarm": {
+    "title": "Reunião",
+    "scheduledAtUtc": "2026-10-15T13:00:00Z",
+    "createdAtUtc": "2026-10-14T13:00:00Z",
+    "timeZoneId": "America/Sao_Paulo",
+    "recurrence": 0,
+    "days": 0,
+    "linkUrl": "https://example.com/meeting",
+    "linkLabel": "Abrir reunião",
+    "soundKind": 0
+  }
+}
+```
+
+`recurrence`: 0 uma vez, 1 diária, 2 semanal. `days` é uma máscara de bits (segunda=1 até domingo=64), obrigatória e não vazia apenas para semanal. `soundKind`: 0 padrão, 1 notificação, 2 exclamação, 3 crítico, 4 silencioso. Arquivos personalizados não são enviados. Datas devem ser UTC; títulos têm até 120 caracteres; links HTTP/HTTPS têm até 2048 caracteres, sem credenciais; legendas têm até 40 caracteres.
+
+PUT retorna 200 com `{ id, version, deleted, mutationId, alarm }`. Também aceita `deleted: true` e `alarm: null`, para o envio da fila de exclusões. A mesma operação reenviada enquanto for a última daquele alarme retorna a mesma versão. Se outra operação já a substituiu, o servidor retorna conflito. Versão desatualizada retorna 409 com `{ message, current }`; cabe ao cliente pedir a resolução ao usuário. Uma exclusão pode ser revertida explicitamente usando sua versão atual e novo conteúdo.
+
+Sincronização retorna `{ cursor, changes }`. O cursor é monotônico por conta, e os dados são lidos em um snapshot consistente. As alterações usam a última versão de cada alarme, incluindo exclusões. Cada escrita bloqueia somente a conta envolvida e incrementa sua revisão na mesma transação. O banco mantém os registros excluídos; o limite inicial é 1000 registros por conta, incluindo essas exclusões. Ao atingir o limite, novas criações retornam 422.
+
+A migration 2 adiciona a revisão da conta e a tabela `PersonalAlarms`, preservando usuários e sessões existentes. Reiniciar o container aplica migrations pendentes. Próxima ocorrência e confirmação de disparo não são campos do servidor: pertencem ao dispositivo local.
+
+Validação desta etapa: 20 testes da API com PostgreSQL real, incluindo oito cenários de alarmes pessoais, e um fluxo integrado entre dois caches do cliente. Os testes da migration também rodam novamente em bancos já inicializados.

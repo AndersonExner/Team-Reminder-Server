@@ -39,7 +39,7 @@ if (args.Contains("--migrate"))
 app.UseExceptionHandler();
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/api/auth"))
+    if (context.Request.Path.StartsWithSegments("/api"))
         context.Response.Headers.CacheControl = "no-store";
     await next(context);
 });
@@ -113,6 +113,7 @@ auth.MapPost("/logout", async (ClaimsPrincipal principal, AuthDb db, Cancellatio
     await db.Sessions.Where(x => x.Id == id).ExecuteDeleteAsync(ct);
     return Results.NoContent();
 }).RequireAuthorization();
+app.MapPersonalAlarms();
 app.Run();
 
 public partial class Program { }
