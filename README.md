@@ -1,6 +1,6 @@
 # Team Reminder Server
 
-API ASP.NET Core (.NET 10) com PostgreSQL para autenticação e persistência dos alarmes pessoais. O aplicativo sincroniza os alarmes com seu cache e dispara as notificações localmente. Grupos e organizações ficam para uma próxima etapa.
+API ASP.NET Core (.NET 10) com PostgreSQL para autenticação, alarmes pessoais e gestão de grupos. O aplicativo sincroniza os alarmes pessoais com seu cache e dispara as notificações localmente. Alarmes compartilhados e organizações ficam para as próximas etapas.
 
 ## Desenvolvimento com Docker
 
@@ -93,4 +93,40 @@ Sincronização retorna `{ cursor, changes }`. O cursor é monotônico por conta
 
 A migration 2 adiciona a revisão da conta e a tabela `PersonalAlarms`, preservando usuários e sessões existentes. Reiniciar o container aplica migrations pendentes. Próxima ocorrência e confirmação de disparo não são campos do servidor: pertencem ao dispositivo local.
 
-Validação desta etapa: 20 testes da API com PostgreSQL real, incluindo oito cenários de alarmes pessoais, e um fluxo integrado entre dois caches do cliente. Os testes da migration também rodam novamente em bancos já inicializados.
+Validação dos alarmes pessoais: 20 testes da API com PostgreSQL real, incluindo oito cenários de alarmes pessoais, e um fluxo integrado entre dois caches do cliente. Os testes da migration também rodam novamente em bancos já inicializados.
+
+## Grupos, participantes e convites
+
+A migration 3 adiciona `Groups`, `GroupMemberships`, `GroupInvitations` e `GroupAuditEvents`, preservando contas, sessões e alarmes existentes. A criação de um grupo e de sua participação como proprietário ocorre na mesma transação.
+
+Papéis: 0 membro, 1 administrador e 2 proprietário. Todos podem consultar seu grupo e participantes; membros podem sair. Administradores e proprietários podem editar dados, convidar, cancelar convites, remover participantes e alterar papéis entre membro e administrador. Somente o proprietário pode transferir a propriedade ou excluir o grupo. Transferência exige um participante já aceito e torna o antigo proprietário administrador. O proprietário não pode ser removido, rebaixado ou sair antes de transferir.
+
+Todos os endpoints exigem Bearer token. A API lê a participação atual no banco a cada operação: o papel não é confiado ao aplicativo ou incluído como autorização permanente no token.
+
+| Método | Caminho | Corpo / parâmetro |
+|---|---|---|
+| GET | `/api/groups` | Grupos ativos do usuário |
+| POST | `/api/groups` | `{ "name": "Desenvolvimento DigitalDesk", "description": "Equipe" }` |
+| GET | `/api/groups/{id}` | Grupo, participantes e convites pendentes para administradores |
+| PATCH | `/api/groups/{id}` | `{ "name": "...", "description": "...", "expectedRevision": 1 }` |
+| DELETE | `/api/groups/{id}?revision=...` | Apenas proprietário |
+| POST | `/api/groups/{id}/leave` | `{ "expectedRevision": 1 }` |
+| POST | `/api/groups/{id}/transfer` | `{ "accountId": "...", "expectedRevision": 1 }` |
+| PATCH | `/api/groups/{id}/members/{accountId}` | `{ "role": 1, "expectedRevision": 1 }` |
+| DELETE | `/api/groups/{id}/members/{accountId}?revision=...` | Remover participante |
+| POST | `/api/groups/{id}/invitations` | `{ "email": "colega@example.com", "expectedRevision": 1 }` |
+| POST | `/api/groups/{id}/invitations/{invitationId}/cancel` | `{ "expectedRevision": 1 }` |
+| GET | `/api/invitations` | Convites recebidos, pendentes e válidos |
+| POST | `/api/invitations/{id}/accept` | Sem corpo; apenas destinatário |
+| POST | `/api/invitations/{id}/decline` | Sem corpo; apenas destinatário |
+| GET | `/api/groups/{id}/audit` | Últimas 50 ações, apenas administradores/proprietário |
+
+Criação retorna 201; ações administrativas e respostas a convites retornam 204. Listagem de grupos retorna `{ id, name, description, ownerAccountId, myRole, revision, memberCount }`. Detalhe retorna `{ group, members, invitations }`. E-mails de participantes são visíveis aos membros do grupo. Não membros recebem 404 ao consultar um grupo, sem acesso aos dados.
+
+Convites são destinados ao e-mail de uma conta existente, sem distinção de maiúsculas/minúsculas, e expiram em sete dias. O destinatário deve aceitar para entrar como membro; criar um convite não concede acesso. Duplicatas pendentes são recusadas. Convites expirados retornam 410 ao serem respondidos e podem ser substituídos por um novo convite. Aceite repetido é idempotente enquanto a pessoa permanece no grupo. Convite aceito não permite reingresso após remoção ou saída. O envio nesta versão é somente dentro do aplicativo, sem serviço de e-mail.
+
+Remover ou rebaixar um administrador cancela seus convites pendentes, assim como sua saída. Exclusão do grupo é lógica: ele desaparece para participantes e destinatários, os convites pendentes são cancelados e o histórico permanece no banco.
+
+Escritas bloqueiam a linha do grupo, revalidam papel e revisão, registram a ação e confirmam uma única transação. Versão antiga retorna 409 e exige atualização; ações negadas não avançam a revisão. Operações em contas para controlar limites usam locks que permitem as verificações de chaves estrangeiras, evitando deadlock em convites recíprocos. Limites iniciais: 20 grupos por proprietário, 100 grupos por usuário, 100 membros por grupo e 100 convites pendentes por grupo ou destinatário; ultrapassagem retorna 422. Requisições dos endpoints de grupos têm limite de 120 por minuto por conta, configurável por `Groups__RequestsPerMinute`.
+
+Validação: 36 testes da API com PostgreSQL real, incluindo 16 cenários de grupos, permissões, convite, expiração, limites e concorrência. Também foi validado um fluxo completo usando o cliente HTTP do aplicativo com três contas, desde criação até transferência, remoção e exclusão. Alarmes compartilhados pelo grupo e organizações ainda não estão implementados.
