@@ -109,6 +109,8 @@ dialog::backdrop { background: #0b0a1499; backdrop-filter: blur(2px); }
 .toast { position: fixed; right: 24px; bottom: 24px; max-width: 420px; padding: 12px 18px; border-radius: 10px; background: var(--text); color: var(--bg); font-size: 14px; box-shadow: 0 12px 32px #0004; z-index: 20; }
 .toast.error-toast { background: var(--bad); color: #fff; }
 .footer { margin-top: 28px; font-size: 13px; }
+/* On the sign-in screen the note sits under the centered card. */
+#login:not([hidden]) ~ .footer { text-align: center; }
 
 @media (max-width: 1000px) { .summary { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 600px) {

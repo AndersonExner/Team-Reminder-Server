@@ -29,20 +29,8 @@ async function loadRelease() {
     const release = await response.json();
     el('download').hidden = false;
     el('release').textContent = 'Versão ' + release.version.replace(/^v/, '') + ' · Publicada em ' + new Date(release.publishedAt).toLocaleDateString('pt-BR');
-    if (release.sha256) {
-      el('sha').textContent = release.sha256;
-      el('checksum').hidden = false;
-    }
   } catch { el('release').textContent = 'Não foi possível consultar o download. Tente novamente mais tarde.'; }
 }
-
-el('copy-sha').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(el('sha').textContent);
-    el('copy-sha').textContent = 'Copiado';
-    setTimeout(() => { el('copy-sha').textContent = 'Copiar'; }, 2000);
-  } catch { el('copy-sha').textContent = 'Selecione e copie'; }
-});
 
 loadStats(); loadRelease();
 setInterval(() => { if (!document.hidden) loadStats(); }, 60000);
