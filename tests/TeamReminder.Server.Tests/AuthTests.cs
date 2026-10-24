@@ -105,19 +105,53 @@ public sealed class AuthTests(ApiFactory factory) : IClassFixture<ApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
         Authorize(client, second.AccessToken);
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+        // A lost rotation response may be retried once with the previous token; it replaces the unseen pair.
+        var retry = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(first.RefreshToken));
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        var third = (await retry.Content.ReadFromJsonAsync<SessionResponse>())!;
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(second.RefreshToken))).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(first.RefreshToken))).StatusCode);
+        Authorize(client, third.AccessToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task PreviousRefreshTokenExpiresAfterGraceWindow()
+    {
+        using var client = factory.CreateClient();
+        var first = await Register(client);
+        Assert.Equal(HttpStatusCode.OK,
+            (await client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(first.RefreshToken))).StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AuthDb>();
+        await db.Sessions.Where(x => x.AccountId == first.User.Id).ExecuteUpdateAsync(
+            setters => setters.SetProperty(x => x.PreviousRefreshValidUntil, DateTimeOffset.UtcNow.AddSeconds(-1)));
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(first.RefreshToken))).StatusCode);
     }
 
     [Fact]
-    public async Task ConcurrentRefreshHasExactlyOneWinner()
+    public async Task ConcurrentRefreshLeavesExactlyOneValidSession()
     {
         using var client = factory.CreateClient();
         var session = await Register(client);
         var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ =>
             client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest(session.RefreshToken))));
-        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.OK);
-        Assert.Single(responses, x => x.StatusCode == HttpStatusCode.Unauthorized);
+        // Overlapping requests either lose the concurrency check or use the one-time grace retry.
+        var issued = new List<SessionResponse>();
+        foreach (var response in responses.Where(x => x.StatusCode == HttpStatusCode.OK))
+            issued.Add((await response.Content.ReadFromJsonAsync<SessionResponse>())!);
+        Assert.NotEmpty(issued);
+        var valid = 0;
+        foreach (var pair in issued)
+        {
+            Authorize(client, pair.AccessToken);
+            if ((await client.GetAsync("/api/auth/me")).StatusCode == HttpStatusCode.OK) valid++;
+        }
+        Assert.Equal(1, valid);
     }
 
     [Fact]

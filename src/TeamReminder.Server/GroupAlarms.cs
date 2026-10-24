@@ -32,10 +32,10 @@ public static class GroupAlarmEndpoints
         }).RequireAuthorization().RequireRateLimiting("groups");
         var alarms=app.MapGroup("/api/groups/{groupId:guid}/alarms").RequireAuthorization().RequireRateLimiting("groups");
         alarms.MapPut("/{id:guid}",WriteAsync);
-        alarms.MapDelete("/{id:guid}",(Guid groupId,Guid id,long version,Guid mutationId,ClaimsPrincipal principal,AuthDb db,CancellationToken ct)=>
-            WriteAsync(groupId,id,new AlarmWriteRequest(version,mutationId,true,null),principal,db,ct));
+        alarms.MapDelete("/{id:guid}",(Guid groupId,Guid id,long version,Guid mutationId,ClaimsPrincipal principal,AuthDb db,TimeProvider clock,CancellationToken ct)=>
+            WriteAsync(groupId,id,new AlarmWriteRequest(version,mutationId,true,null),principal,db,clock,ct));
     }
-    private static async Task<IResult> WriteAsync(Guid groupId,Guid id,AlarmWriteRequest request,ClaimsPrincipal principal,AuthDb db,CancellationToken ct)
+    private static async Task<IResult> WriteAsync(Guid groupId,Guid id,AlarmWriteRequest request,ClaimsPrincipal principal,AuthDb db,TimeProvider clock,CancellationToken ct)
     {
         var errors=PersonalAlarmEndpoints.Validate(id,request);if(errors.Count>0)return Results.ValidationProblem(errors);
         var actor=Guid.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -69,11 +69,11 @@ public static class GroupAlarmEndpoints
                 LinkUrl=string.IsNullOrWhiteSpace(definition.LinkUrl)?null:new Uri(definition.LinkUrl.Trim()).AbsoluteUri,
                 LinkLabel=string.IsNullOrWhiteSpace(definition.LinkUrl)?null:string.IsNullOrWhiteSpace(definition.LinkLabel)?"Abrir link":definition.LinkLabel.Trim()
             };
-            if(definition.Recurrence==0&&definition.ScheduledAtUtc<=DateTimeOffset.UtcNow)return Results.ValidationProblem(new Dictionary<string,string[]>{{"schedule",["Escolha uma data futura para o alarme do grupo."]}});
+            if(definition.Recurrence==0&&definition.ScheduledAtUtc<=clock.GetUtcNow())return Results.ValidationProblem(new Dictionary<string,string[]>{{"schedule",["Escolha uma data futura para o alarme do grupo."]}});
             alarm.DefinitionJson=JsonSerializer.Serialize(definition);
         }
         alarm.Version++;alarm.MutationId=request.MutationId;alarm.Deleted=request.Deleted;
-        db.GroupAuditEvents.Add(new(){GroupId=groupId,ActorAccountId=actor,Action=request.Deleted?"AlarmDeleted":alarm.Version==1?"AlarmCreated":"AlarmUpdated",CreatedAt=DateTimeOffset.UtcNow});
+        db.GroupAuditEvents.Add(new(){GroupId=groupId,ActorAccountId=actor,Action=request.Deleted?"AlarmDeleted":alarm.Version==1?"AlarmCreated":"AlarmUpdated",CreatedAt=clock.GetUtcNow()});
         await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
         return alarm.Deleted?Results.NoContent():Results.Ok(alarm.Response(team.Name,true));
     }

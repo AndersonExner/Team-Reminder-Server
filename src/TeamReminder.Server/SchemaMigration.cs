@@ -92,6 +92,12 @@ public static class SchemaMigration
                 CREATE INDEX "IX_GroupAlarms_GroupId" ON "GroupAlarms" ("GroupId");
                 INSERT INTO schema_versions(version) VALUES (5);
             END IF;
+            IF NOT EXISTS (SELECT 1 FROM schema_versions WHERE version = 6) THEN
+                ALTER TABLE "Sessions" ADD COLUMN "PreviousRefreshHash" text,
+                    ADD COLUMN "PreviousRefreshValidUntil" timestamptz;
+                CREATE INDEX "IX_Sessions_PreviousRefreshHash" ON "Sessions" ("PreviousRefreshHash");
+                INSERT INTO schema_versions(version) VALUES (6);
+            END IF;
             END $$;
             """, connection, transaction);
         await command.ExecuteNonQueryAsync();
