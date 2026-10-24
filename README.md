@@ -17,7 +17,7 @@ O banco não publica porta no host. O volume `postgres-data` persiste os dados. 
 
 | Método | Caminho | Corpo / autenticação |
 |---|---|---|
-| POST | `/api/auth/register` | `{ "name": "Nome", "email": "nome@example.com", "password": "senha com pelo menos 10 caracteres" }` |
+| POST | `/api/auth/register` | `{ "name": "Nome", "email": "nome@example.com", "password": "senha com pelo menos 6 caracteres" }` |
 | POST | `/api/auth/login` | `{ "email": "nome@example.com", "password": "..." }` |
 | POST | `/api/auth/refresh` | `{ "refreshToken": "..." }` |
 | GET | `/api/auth/me` | `Authorization: Bearer <accessToken>` |
@@ -25,7 +25,7 @@ O banco não publica porta no host. O volume `postgres-data` persiste os dados. 
 
 Cadastro retorna 201; login e refresh retornam 200, com `accessToken`, `refreshToken`, `accessExpiresAt`, `refreshExpiresAt` e `user` (`id`, `name`, `email`). Cadastro já conecta o usuário. Logout retorna 204 e revoga a sessão atual. Outras sessões do mesmo usuário continuam válidas.
 
-Access token: 15 minutos. Sessão: 30 dias, sem extensão automática. Refresh troca ambos os tokens e invalida os anteriores, com controle de concorrência. Se a resposta da rotação se perder, o refresh token anterior é aceito uma única vez por até 60 segundos, substituindo o par não recebido. Sessões expiradas são removidas periodicamente. Tokens aleatórios de 256 bits são armazenados apenas como hash SHA-256. Senhas usam PasswordHasher do ASP.NET Core Identity, PBKDF2 com salt e 210 mil iterações. E-mails são únicos sem distinção de maiúsculas e minúsculas. Senhas têm de 10 a 128 caracteres. Respostas de autenticação não devem ser armazenadas em cache. Endpoints de autenticação têm limite de 20 solicitações/minuto por IP do cliente. Atrás de um proxy de hospedagem, defina `ForwardedHeaders__Enabled=true` para usar o IP de `X-Forwarded-For`; habilite apenas quando o container não for acessível diretamente.
+Access token: 15 minutos. Sessão: 30 dias, sem extensão automática. Refresh troca ambos os tokens e invalida os anteriores, com controle de concorrência. Se a resposta da rotação se perder, o refresh token anterior é aceito uma única vez por até 60 segundos, substituindo o par não recebido. Sessões expiradas são removidas periodicamente. Tokens aleatórios de 256 bits são armazenados apenas como hash SHA-256. Senhas usam PasswordHasher do ASP.NET Core Identity, PBKDF2 com salt e 210 mil iterações. E-mails são únicos sem distinção de maiúsculas e minúsculas. Senhas têm de 6 a 128 caracteres. Respostas de autenticação não devem ser armazenadas em cache. Endpoints de autenticação têm limite de 20 solicitações/minuto por IP do cliente. Atrás de um proxy de hospedagem, defina `ForwardedHeaders__Enabled=true` para usar o IP de `X-Forwarded-For`; habilite apenas quando o container não for acessível diretamente.
 
 `/health` verifica o processo; `/health/ready` verifica a conexão com o banco. Recuperação de senha e verificação de e-mail ainda não foram implementadas.
 

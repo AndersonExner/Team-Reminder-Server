@@ -76,6 +76,14 @@ public sealed class AuthTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task SixCharacterPasswordIsAccepted()
+    {
+        using var client = factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest("Curta", Email(), "abc123"));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
     public async Task LoginAcceptsNormalizedEmailAndRejectsWrongPassword()
     {
         using var client = factory.CreateClient();

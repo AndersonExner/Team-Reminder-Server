@@ -207,8 +207,8 @@ namespace TeamReminder.Server
             if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Trim().Length > 100)
                 errors["name"] = ["Informe um nome de até 100 caracteres."];
             if (!ValidEmail(request.Email)) errors["email"] = ["Informe um e-mail válido."];
-            if (request.Password is null || request.Password.Length is < 10 or > 128 || string.IsNullOrWhiteSpace(request.Password))
-                errors["password"] = ["Use uma senha de 10 a 128 caracteres."];
+            if (request.Password is null || request.Password.Length is < 6 or > 128 || string.IsNullOrWhiteSpace(request.Password))
+                errors["password"] = ["Use uma senha de 6 a 128 caracteres."];
             return errors;
         }
     }
