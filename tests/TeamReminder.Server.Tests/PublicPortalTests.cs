@@ -43,6 +43,19 @@ public sealed class PublicPortalTests
         Assert.Equal(expected, result is not null);
         if (expected) { Assert.Equal("v0.2.0", result!.Version); Assert.Equal(url, result.DownloadUrl); }
     }
+    [Theory]
+    [InlineData("CDBCCEC987541E8A801860992DE3C98759E488929901A5586B8644886C9D04B4", "cdbccec987541e8a801860992de3c98759e488929901a5586b8644886c9d04b4")]
+    [InlineData("not-a-checksum", null)]
+    [InlineData(null, null)]
+    public async Task ReleaseExposesOnlyWellFormedChecksum(string? published, string? expected)
+    {
+        using var handler = new Handler(HttpStatusCode.OK, new {
+            tag_name = "v0.4.0", published_at = DateTimeOffset.UtcNow, draft = false, prerelease = false,
+            assets = new[] { new { name = "TeamReminder-Setup-0.4.0-x64.exe", sha256 = published,
+                browser_download_url = "https://github.com/AndersonExner/Team-Reminder-Client/releases/download/v0.4.0/TeamReminder-Setup-0.4.0-x64.exe" } }
+        });
+        Assert.Equal(expected, (await Portal(handler).ReleaseAsync(default))!.Sha256);
+    }
     [Fact]
     public async Task UpstreamFailureDoesNotBecomeAMissingRelease()
     {
