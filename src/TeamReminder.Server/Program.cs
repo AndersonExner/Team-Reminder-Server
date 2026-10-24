@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -22,6 +23,7 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.Configure<PasswordHasherOptions>(o => o.IterationCount = 210_000);
 builder.Services.AddSingleton<IPasswordHasher<Account>, PasswordHasher<Account>>();
 builder.Services.AddSingleton<DummyPassword>();
+builder.Services.AddHostedService<SessionCleanup>();
 builder.Services.AddAuthentication("Session").AddScheme<AuthenticationSchemeOptions, SessionAuthentication>("Session", _ => { });
 builder.Services.AddAuthorization(o => o.AddPolicy("SystemAdmin", p => p.RequireAuthenticatedUser().RequireClaim("system_admin", "true")));
 builder.Services.AddProblemDetails();
@@ -36,6 +38,15 @@ builder.Services.AddRateLimiter(o =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("Auth:RequestsPerMinute") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 16 * 1024);
+// Behind a hosting proxy (Render), the connection IP is the proxy's; rate limits must use the forwarded client IP.
+// Enable only when the container is reachable exclusively through that proxy, otherwise clients could spoof it.
+builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((o, config) =>
+{
+    if (!config.GetValue<bool>("ForwardedHeaders:Enabled")) return;
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+});
 var app = builder.Build();
 var connection = app.Configuration.GetConnectionString("Database")
     ?? throw new InvalidOperationException("Configure ConnectionStrings__Database.");
@@ -52,6 +63,7 @@ if (args.Contains("--bootstrap-admin"))
     return;
 }
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.Use(async (context, next) =>
 {
@@ -120,8 +132,20 @@ auth.MapPost("/refresh", async (RefreshRequest request, AuthDb db, TimeProvider 
     var hash = AuthTokens.Hash(request.RefreshToken);
     var now = clock.GetUtcNow();
     var session = await db.Sessions.Include(x => x.Account).SingleOrDefaultAsync(
-        x => x.Account.IsActive && x.Account.DeletedAt == null && x.AccountVersion == x.Account.SessionVersion && x.RefreshHash == hash && x.RefreshExpiresAt > now, ct);
+        x => x.Account.IsActive && x.Account.DeletedAt == null && x.AccountVersion == x.Account.SessionVersion && x.RefreshExpiresAt > now
+            && (x.RefreshHash == hash || (x.PreviousRefreshHash == hash && x.PreviousRefreshValidUntil > now)), ct);
     if (session is null) return Results.Unauthorized();
+    if (session.RefreshHash == hash)
+    {
+        session.PreviousRefreshHash = hash;
+        session.PreviousRefreshValidUntil = now.AddSeconds(60);
+    }
+    else
+    {
+        // A retry after a lost response: the unseen pair is replaced and the old token cannot be reused again.
+        session.PreviousRefreshHash = null;
+        session.PreviousRefreshValidUntil = null;
+    }
     var response = AuthTokens.Rotate(session, now, false);
     try { await db.SaveChangesAsync(ct); }
     catch (DbUpdateConcurrencyException) { return Results.Unauthorized(); }
@@ -141,12 +165,20 @@ auth.MapPost("/logout", async (ClaimsPrincipal principal, AuthDb db, Cancellatio
 app.MapGet("/api/public/statistics", async (PublicPortal portal, CancellationToken ct) =>
     Results.Ok(await portal.StatisticsAsync(ct)));
 app.MapGet("/api/public/release", async (PublicPortal portal, CancellationToken ct) => {
-    var release = await portal.ReleaseAsync(ct);
-    return release is null ? Results.NotFound(new { message = "Nenhum instalador publicado." }) : Results.Ok(release);
+    try
+    {
+        var release = await portal.ReleaseAsync(ct);
+        return release is null ? Results.NotFound(new { message = "Nenhum instalador publicado." }) : Results.Ok(release);
+    }
+    catch (HttpRequestException) { return Results.Json(new { message = "Não foi possível consultar a release. Tente novamente." }, statusCode: 503); }
 });
 app.MapGet("/download/windows", async (PublicPortal portal, CancellationToken ct) => {
-    var release = await portal.ReleaseAsync(ct);
-    return release is null ? Results.NotFound(new { message = "Download em breve." }) : Results.Redirect(release.DownloadUrl);
+    try
+    {
+        var release = await portal.ReleaseAsync(ct);
+        return release is null ? Results.NotFound(new { message = "Download em breve." }) : Results.Redirect(release.DownloadUrl);
+    }
+    catch (HttpRequestException) { return Results.Json(new { message = "Download temporariamente indisponível." }, statusCode: 503); }
 });
 app.MapAdministration();
 app.MapPersonalAlarms();

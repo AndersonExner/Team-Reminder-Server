@@ -26,6 +26,9 @@ public sealed class LoginSession
     public long AccountVersion { get; set; }
     public string AccessHash { get; set; } = "";
     public string RefreshHash { get; set; } = "";
+    // Lets a client retry once with the token it sent when the rotation response was lost.
+    public string? PreviousRefreshHash { get; set; }
+    public DateTimeOffset? PreviousRefreshValidUntil { get; set; }
     public DateTimeOffset AccessExpiresAt { get; set; }
     public DateTimeOffset RefreshExpiresAt { get; set; }
 }
@@ -103,6 +106,7 @@ public sealed class AuthDb(DbContextOptions<AuthDb> options) : DbContext(options
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.AccessHash).IsUnique();
             e.HasIndex(x => x.RefreshHash).IsUnique();
+            e.HasIndex(x => x.PreviousRefreshHash);
             e.Property(x => x.RefreshHash).IsConcurrencyToken();
             e.HasOne(x => x.Account).WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
         });

@@ -32,7 +32,7 @@ Depois de integrar a configuração à main, no Render:
 4. Informe `ConnectionStrings__Database` quando o blueprint pedir o valor.
 5. Inicie o deploy e acompanhe os logs.
 
-Alternativamente, crie New > Web Service com runtime Docker, branch main, Dockerfile `./Dockerfile`, plano Free e health check `/health/ready`. Defina `ASPNETCORE_ENVIRONMENT=Production` e a conexão do banco. Não há Build Command ou Start Command adicional: o Dockerfile e o entrypoint cuidam disso.
+Alternativamente, crie New > Web Service com runtime Docker, branch main, Dockerfile `./Dockerfile`, plano Free e health check `/health/ready`. Defina `ASPNETCORE_ENVIRONMENT=Production`, `ForwardedHeaders__Enabled=true` (limites por IP do cliente, não do proxy) e a conexão do banco. Não há Build Command ou Start Command adicional: o Dockerfile e o entrypoint cuidam disso.
 
 O entrypoint usa a variável `PORT` da hospedagem; localmente, mantém a porta 8080. A API atende HTTP dentro do container, com HTTPS na URL pública fornecida pelo Render. Cada commit na main pode disparar um novo deploy conforme a configuração e a conexão do GitHub.
 

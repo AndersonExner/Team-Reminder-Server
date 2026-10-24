@@ -15,5 +15,7 @@ services:
         value: Production
       - key: ASPNETCORE_HTTP_PORTS
         value: 10000
+      - key: ForwardedHeaders__Enabled
+        value: true
       - key: ConnectionStrings__Database
         sync: false

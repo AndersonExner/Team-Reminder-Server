@@ -85,10 +85,14 @@ public static class PersonalAlarmEndpoints
             return Results.Ok(row.ToChange());
         if ((row?.Version ?? 0) != request.ExpectedVersion)
             return Results.Conflict(new { message = "O alarme foi alterado em outro dispositivo.", current = row?.ToChange() });
+        // Tombstones stay for incremental sync but do not count toward the limit; restoring one does.
+        if (!request.Deleted && row is not { Deleted: false } &&
+            await db.PersonalAlarms.CountAsync(x => x.AccountId == owner && !x.Deleted, ct) >= 1000)
+            return Results.Json(new { message = "Limite de 1000 alarmes ativos por conta atingido." }, statusCode: 422);
         if (row is null)
         {
-            if (await db.PersonalAlarms.CountAsync(x => x.AccountId == owner, ct) >= 1000)
-                return Results.Problem("Limite de 1000 registros por conta atingido, incluindo exclusões.", statusCode: 422);
+            if (await db.PersonalAlarms.CountAsync(x => x.AccountId == owner, ct) >= 10_000)
+                return Results.Json(new { message = "Limite de registros da conta atingido, incluindo exclusões." }, statusCode: 422);
             row = new PersonalAlarm { Id = id, AccountId = owner };
             db.PersonalAlarms.Add(row);
         }

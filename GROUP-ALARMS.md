@@ -6,7 +6,7 @@ PUT /api/groups/{groupId}/alarms/{id} usa AlarmWriteRequest (expectedVersion, mu
 
 GET /api/group-alarms retorna um snapshot completo dos alarmes não excluídos dos grupos ativos do usuário, incluindo nome do grupo, versão e permissão de edição atual. A participação precisa estar aceita. Quem entra posteriormente recebe as definições existentes; usuários removidos ou grupos suspensos deixam de aparecer no snapshot.
 
-Limite: 100 registros por grupo, incluindo tombstones. A API exige um horário futuro para avisos únicos. Arquivos de áudio não são enviados; usam-se sons integrados ou o padrão local de cada dispositivo.
+Limite: 100 alarmes ativos por grupo; exclusões não contam, com teto de 10000 registros incluindo exclusões. A API exige um horário futuro para avisos únicos. Arquivos de áudio não são enviados; usam-se sons integrados ou o padrão local de cada dispositivo.
 
 O cliente aplica snapshots no cache da conta sem inserir na fila dos alarmes pessoais. A remoção só ocorre depois de uma resposta completa e bem-sucedida. Falhas de rede preservam o cache. Comprovantes de disparo são locais e preservados para evitar repetição após atualização ou suspensão temporária do grupo. A sincronização periódica existente é de 60 segundos e também pode ser acionada em Configurações.
 

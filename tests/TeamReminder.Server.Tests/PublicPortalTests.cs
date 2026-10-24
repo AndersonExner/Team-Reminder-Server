@@ -9,16 +9,17 @@ public sealed class PublicPortalTests
 {
     private sealed class Handler(HttpStatusCode status, object? payload) : HttpMessageHandler, IHttpClientFactory
     {
+        public HttpStatusCode Status { get; set; } = status;
         public int Calls { get; private set; }
         public HttpClient CreateClient(string name) => new(this, false) { BaseAddress = new Uri("https://api.github.com/") };
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Calls++;
-            return Task.FromResult(new HttpResponseMessage(status) { Content = JsonContent.Create(payload) });
+            return Task.FromResult(new HttpResponseMessage(Status) { Content = JsonContent.Create(payload) });
         }
     }
-    private static PublicPortal Portal(Handler handler) => new(new MemoryCache(new MemoryCacheOptions()),
-        new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), handler);
+    private static PublicPortal Portal(Handler handler, IMemoryCache? cache = null) => new(cache ?? new MemoryCache(new MemoryCacheOptions()),
+        new ServiceCollection().BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(), handler, TimeProvider.System);
     [Fact]
     public async Task MissingReleaseIsCachedAndDoesNotInventADownload()
     {
@@ -47,5 +48,26 @@ public sealed class PublicPortalTests
     {
         using var handler = new Handler(HttpStatusCode.Forbidden, null);
         await Assert.ThrowsAsync<HttpRequestException>(() => Portal(handler).ReleaseAsync(default));
+    }
+    [Fact]
+    public async Task UpstreamFailureIsCachedBrieflyAndServesLastKnownRelease()
+    {
+        using var failing = new Handler(HttpStatusCode.Forbidden, null);
+        var portal = Portal(failing);
+        await Assert.ThrowsAsync<HttpRequestException>(() => portal.ReleaseAsync(default));
+        await Assert.ThrowsAsync<HttpRequestException>(() => portal.ReleaseAsync(default));
+        Assert.Equal(1, failing.Calls);
+
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        using var handler = new Handler(HttpStatusCode.OK, new {
+            tag_name = "v0.2.0", published_at = DateTimeOffset.UtcNow, draft = false, prerelease = false,
+            assets = new[] { new { name = "TeamReminder-Setup-0.2.0-x64.exe",
+                browser_download_url = "https://github.com/AndersonExner/Team-Reminder-Client/releases/download/v0.2.0/TeamReminder-Setup-0.2.0-x64.exe" } }
+        });
+        var known = Portal(handler, cache);
+        Assert.NotNull(await known.ReleaseAsync(default));
+        cache.Remove("release");
+        handler.Status = HttpStatusCode.BadGateway;
+        Assert.Equal("v0.2.0", (await known.ReleaseAsync(default))!.Version);
     }
 }

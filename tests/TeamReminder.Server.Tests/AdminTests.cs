@@ -41,6 +41,16 @@ public sealed class AdminTests(ApiFactory factory): IClassFixture<ApiFactory>
         }
     }
     [Fact]
+    public async Task SearchIgnoresCaseAndTreatsWildcardsLiterally()
+    {
+        var (admin,_)=await Login(true);var (user,s)=await Login();using(admin)using(user){
+            var found=(await admin.GetFromJsonAsync<AdminPage<AdminUser>>("/api/admin/users?q="+Uri.EscapeDataString(s.User.Email.ToUpperInvariant())))!;
+            Assert.Equal(s.User.Id,Assert.Single(found.Items).Id);
+            var wildcard=(await admin.GetFromJsonAsync<AdminPage<AdminUser>>("/api/admin/users?q="+Uri.EscapeDataString("%_%")))!;
+            Assert.DoesNotContain(wildcard.Items,x=>x.Id==s.User.Id);
+        }
+    }
+    [Fact]
     public async Task DisabledAccountLosesAccessRefreshAndLoginAndOldSessionCannotRevive()
     {
         var (admin,_)=await Login(true);var (user,s)=await Login();using(admin)using(user){
