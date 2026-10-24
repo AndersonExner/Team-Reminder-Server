@@ -219,7 +219,7 @@ public static class AdminBootstrap
         var clock=scope.ServiceProvider.GetRequiredService<TimeProvider>();
         var email=config["Admin:Email"];var password=config["Admin:Password"];
         var errors=RegistrationValidation.Validate(new(config["Admin:Name"]??"Administrador",email,password));
-        if(errors.Count>0)throw new InvalidOperationException("Configure Admin__Email, Admin__Password (10 a 128 caracteres) e opcionalmente Admin__Name.");
+        if(errors.Count>0)throw new InvalidOperationException("Configure Admin__Email, Admin__Password (6 a 128 caracteres) e opcionalmente Admin__Name.");
         await using var tx=await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(734620261015)");
         if(await db.Accounts.AnyAsync(x=>x.IsSystemAdmin&&x.IsActive&&x.DeletedAt==null))throw new InvalidOperationException("Já existe administrador ativo. Use o painel.");
