@@ -1,20 +1,91 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administração · Team Reminder</title><link rel="stylesheet" href="/admin/admin.css"><script src="/admin/admin.js" defer></script></head>
-<body><main><header><a href="/">◷ Team Reminder</a><span>Administração do sistema</span><button id="logout" hidden>Sair</button></header>
-<p id="message" role="status" aria-live="polite"></p>
-<section id="login"><h1>Acesso administrativo</h1><p>Entre com uma conta administradora do sistema.</p>
-<form id="login-form"><label>E-mail<input id="login-email" type="email" autocomplete="username" required maxlength="254"></label><label>Senha<input id="login-password" type="password" autocomplete="current-password" required maxlength="128"></label><button>Entrar</button></form></section>
-<section id="panel" hidden><h1>Visão geral</h1><div id="summary" class="summary"></div>
-<nav><button data-tab="users">Usuários</button><button data-tab="groups">Grupos</button><button data-tab="audit">Auditoria</button></nav>
-<div class="toolbar"><input id="search" aria-label="Buscar por nome ou e-mail" placeholder="Buscar por nome ou e-mail" maxlength="254"><select id="status" aria-label="Filtrar situação"><option value="">Todos</option><option value="active">Ativos</option><option value="inactive">Desativados</option><option value="deleted">Excluídos</option></select><button id="filter">Buscar</button><button id="create">Novo usuário</button></div>
-<div class="table-wrap"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
-<div class="pagination"><button id="previous">Anterior</button><span id="pagination"></span><button id="next">Próxima</button></div>
-</section>
-<dialog id="editor"><form id="edit-form"><h2 id="edit-title"></h2><label>Nome<input id="name" required maxlength="100"></label>
-<div id="user-fields"><label>E-mail<input id="email" type="email" maxlength="254"></label><label>Senha <small>Deixe em branco para manter a atual</small><input id="password" type="password" autocomplete="new-password" minlength="10" maxlength="128"></label><label class="check"><input id="system-admin" type="checkbox">Administrador do sistema</label></div>
-<div id="group-fields"><label>Descrição<textarea id="description" maxlength="500"></textarea></label><label>E-mail do proprietário<input id="owner" type="email" placeholder="usuario@exemplo.com"></label></div>
-<label class="check"><input id="active" type="checkbox">Ativo</label><p class="detail">Desativar bloqueia o acesso. Alterações de senha ou permissão encerram as sessões. As notificações já salvas no computador continuam locais.</p>
-<div class="actions"><button type="button" id="cancel-edit">Cancelar</button><button id="save">Salvar</button></div><p id="edit-error" role="alert"></p></form></dialog>
-<dialog id="details"><h2>Detalhes</h2><div id="detail-content"></div><button id="close-details">Fechar</button></dialog>
-<footer>Exclusão lógica preserva o histórico. Registros restaurados voltam desativados. As ações administrativas são auditadas.</footer>
-</main></body></html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<title>Administração · Team Reminder</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/admin/admin.css">
+<script src="/admin/admin.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26">Team Reminder</a>
+  <span class="tag">Administração</span>
+  <span class="spacer"></span>
+  <span id="who" class="who" hidden></span>
+  <button id="logout" class="btn" hidden>Sair</button>
+</header>
+
+<main>
+  <section id="login" class="login">
+    <div class="card login-card">
+      <img src="/favicon.svg" alt="" width="48" height="48">
+      <h1>Acesso administrativo</h1>
+      <p class="muted">Entre com uma conta administradora do sistema.</p>
+      <form id="login-form">
+        <label>E-mail<input id="login-email" type="email" autocomplete="username" required maxlength="254"></label>
+        <label>Senha<input id="login-password" type="password" autocomplete="current-password" required maxlength="128"></label>
+        <button class="btn primary block">Entrar</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="panel" hidden>
+    <div class="page-head">
+      <div><h1>Visão geral</h1><p class="muted">Contas, grupos e ações administrativas do Team Reminder.</p></div>
+    </div>
+    <div id="summary" class="summary"></div>
+
+    <div class="tabs" role="tablist" aria-label="Seções">
+      <button role="tab" data-tab="users" aria-selected="true">Usuários</button>
+      <button role="tab" data-tab="groups" aria-selected="false">Grupos</button>
+      <button role="tab" data-tab="audit" aria-selected="false">Auditoria</button>
+    </div>
+
+    <div class="card">
+      <form id="filter-form" class="toolbar">
+        <input id="search" type="search" aria-label="Buscar por nome ou e-mail" placeholder="Buscar por nome ou e-mail" maxlength="254">
+        <select id="status" aria-label="Filtrar situação"><option value="">Todas as situações</option><option value="active">Ativos</option><option value="inactive">Desativados</option><option value="deleted">Excluídos</option></select>
+        <button id="filter" class="btn">Buscar</button>
+        <span class="spacer"></span>
+        <button id="create" type="button" class="btn primary">Novo usuário</button>
+      </form>
+      <div class="table-wrap"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
+      <div class="pagination"><span id="pagination" class="muted"></span><span class="spacer"></span><button id="previous" class="btn">Anterior</button><button id="next" class="btn">Próxima</button></div>
+    </div>
+  </section>
+
+  <dialog id="editor">
+    <form id="edit-form">
+      <h2 id="edit-title"></h2>
+      <label>Nome<input id="name" required maxlength="100"></label>
+      <div id="user-fields">
+        <label>E-mail<input id="email" type="email" maxlength="254"></label>
+        <label>Senha <small class="muted">Deixe em branco para manter a atual</small><input id="password" type="password" autocomplete="new-password" minlength="10" maxlength="128"></label>
+        <label class="check"><input id="system-admin" type="checkbox">Administrador do sistema</label>
+      </div>
+      <div id="group-fields">
+        <label>Descrição<textarea id="description" maxlength="500" rows="3"></textarea></label>
+        <label>E-mail do proprietário<input id="owner" type="email" placeholder="usuario@exemplo.com"></label>
+      </div>
+      <label class="check"><input id="active" type="checkbox">Ativo</label>
+      <p class="muted small">Desativar bloqueia o acesso. Alterações de senha ou permissão encerram as sessões. Os alarmes já salvos nos computadores continuam tocando localmente.</p>
+      <p id="edit-error" class="error" role="alert"></p>
+      <div class="actions"><button type="button" id="cancel-edit" class="btn">Cancelar</button><button id="save" class="btn primary">Salvar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="details">
+    <div class="dialog-head"><h2 id="details-title">Detalhes</h2><button id="close-details" class="btn">Fechar</button></div>
+    <div id="detail-content"></div>
+  </dialog>
+
+  <footer class="footer muted">Exclusão lógica preserva o histórico. Registros restaurados voltam desativados. As ações administrativas são auditadas.</footer>
+</main>
+
+<div id="message" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

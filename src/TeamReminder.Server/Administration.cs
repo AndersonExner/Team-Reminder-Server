@@ -19,6 +19,7 @@ public sealed record AdminRevision(long Revision);
 public sealed record AdminUser(Guid Id, string Name, string Email, bool IsActive, bool IsSystemAdmin, DateTimeOffset? DeletedAt, long Revision, DateTimeOffset CreatedAt);
 public sealed record AdminGroup(Guid Id, string Name, string Description, Guid OwnerAccountId, bool IsActive, DateTimeOffset? DeletedAt, long Revision, DateTimeOffset CreatedAt, string? OwnerEmail = null);
 public sealed record AdminPage<T>(IReadOnlyList<T> Items, long Total, int Page, int PageSize);
+public sealed record AdminAuditItem(Guid Id, Guid ActorAccountId, Guid TargetId, string Entity, string Action, DateTimeOffset CreatedAt, string? ActorName, string? TargetName);
 
 public static class AdminEndpoints
 {
@@ -197,8 +198,13 @@ public static class AdminEndpoints
         });
         api.MapGet("/audit",async(int? page,TimeProvider clock,AuthDb db,CancellationToken ct)=>{
             var number=Math.Clamp(page??1,1,100000);var total=await db.AdminAuditEvents.LongCountAsync(ct);
-            var rows=await db.AdminAuditEvents.AsNoTracking().OrderByDescending(x=>x.CreatedAt).ThenBy(x=>x.Id).Skip((number-1)*20).Take(20).ToListAsync(ct);
-            return Results.Ok(new AdminPage<AdminAuditEvent>(rows,total,number,20));
+            // Names make the log readable; identifiers stay for records that were renamed or removed.
+            var rows=await db.AdminAuditEvents.AsNoTracking().OrderByDescending(x=>x.CreatedAt).ThenBy(x=>x.Id).Skip((number-1)*20).Take(20)
+                .Select(x=>new AdminAuditItem(x.Id,x.ActorAccountId,x.TargetId,x.Entity,x.Action,x.CreatedAt,
+                    db.Accounts.Where(a=>a.Id==x.ActorAccountId).Select(a=>a.Name).FirstOrDefault(),
+                    x.Entity=="User"?db.Accounts.Where(a=>a.Id==x.TargetId).Select(a=>a.Name).FirstOrDefault():db.Groups.Where(g=>g.Id==x.TargetId).Select(g=>g.Name).FirstOrDefault()))
+                .ToListAsync(ct);
+            return Results.Ok(new AdminPage<AdminAuditItem>(rows,total,number,20));
         });
     }
 }

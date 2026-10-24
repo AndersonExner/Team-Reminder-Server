@@ -80,8 +80,9 @@ public sealed class AdminTests(ApiFactory factory): IClassFixture<ApiFactory>
             response=await admin.PostAsJsonAsync("/api/admin/users/"+a.Id+"/restore",new AdminRevision(a.Revision));
             Assert.Equal(HttpStatusCode.OK,response.StatusCode);a=(await response.Content.ReadFromJsonAsync<AdminUser>())!;
             Assert.Null(a.DeletedAt);Assert.False(a.IsActive);
-            var audit=await admin.GetFromJsonAsync<AdminPage<AdminAuditEvent>>("/api/admin/audit");
-            Assert.Contains(audit!.Items,x=>x.TargetId==a.Id&&x.Action=="Restored");
+            var audit=await admin.GetFromJsonAsync<AdminPage<AdminAuditItem>>("/api/admin/audit");
+            var restored=Assert.Single(audit!.Items,x=>x.TargetId==a.Id&&x.Action=="Restored");
+            Assert.Equal(a.Name,restored.TargetName);Assert.Equal("Admin tests",restored.ActorName);
             Assert.DoesNotContain("password",await (await admin.GetAsync("/api/admin/users")).Content.ReadAsStringAsync(),StringComparison.OrdinalIgnoreCase);
         }
     }

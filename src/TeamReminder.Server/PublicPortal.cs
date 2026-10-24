@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 namespace TeamReminder.Server;
 public sealed record PublicStatistics(long Accounts, long Groups, long Alarms, DateTimeOffset UpdatedAt);
-public sealed record DesktopRelease(string Version, DateTimeOffset PublishedAt, string DownloadUrl);
+public sealed record DesktopRelease(string Version, DateTimeOffset PublishedAt, string DownloadUrl, string? Sha256 = null);
 public sealed class PublicPortal(IMemoryCache cache, IServiceScopeFactory scopes, IHttpClientFactory clients, TimeProvider clock)
 {
     private readonly SemaphoreSlim gate = new(1);
@@ -53,7 +53,10 @@ public sealed class PublicPortal(IMemoryCache cache, IServiceScopeFactory scopes
                     && x.Name.EndsWith("-x64.exe", StringComparison.Ordinal)
                     && Uri.TryCreate(x.Url, UriKind.Absolute, out var uri) && uri.Scheme == "https"
                     && uri.Host == "github.com" && uri.AbsolutePath.StartsWith("/AndersonExner/Team-Reminder-Client/releases/download/", StringComparison.Ordinal));
-                if (data is { Draft: false, Prerelease: false } && asset is not null) release = new(data.Tag, data.PublishedAt, asset.Url);
+                // The checksum is shown on the download page only when it is a well-formed SHA-256.
+                if (data is { Draft: false, Prerelease: false } && asset is not null)
+                    release = new(data.Tag, data.PublishedAt, asset.Url,
+                        asset.Sha256 is { Length: 64 } sha && sha.All(Uri.IsHexDigit) ? sha.ToLowerInvariant() : null);
             }
             cache.Set("release", new ReleaseCache(release, false), TimeSpan.FromMinutes(5));
             lastKnownRelease = release;
@@ -65,5 +68,5 @@ public sealed class PublicPortal(IMemoryCache cache, IServiceScopeFactory scopes
     }
     private sealed record GitHubRelease([property: JsonPropertyName("tag_name")] string Tag,
         [property: JsonPropertyName("published_at")] DateTimeOffset PublishedAt, bool Draft, bool Prerelease, GitHubAsset[] Assets);
-    private sealed record GitHubAsset(string Name, [property: JsonPropertyName("browser_download_url")] string Url);
+    private sealed record GitHubAsset(string Name, [property: JsonPropertyName("browser_download_url")] string Url, string? Sha256 = null);
 }

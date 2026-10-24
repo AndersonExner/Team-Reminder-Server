@@ -1,5 +1,109 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Team Reminder</title><link rel="stylesheet" href="/portal.css"><script src="/portal.js" defer></script></head>
-<body><main><header><b>◷ Team Reminder</b><span id="api" role="status">Verificando API…</span></header>
-<section class="hero"><p class="eyebrow">SEU TEMPO, BEM LEMBRADO</p><h1>Um lembrete hoje.<br>Mais tranquilidade amanhã.</h1><p>Organize seus alarmes, mantenha seus lembretes sincronizados e conecte sua equipe em grupos. As notificações acontecem no seu computador.</p><a id="download" class="button" hidden href="/download/windows">Baixar para Windows</a><p id="release" class="detail" role="status">Consultando a versão do aplicativo…</p><p class="detail">Windows 10 (versão 2004) ou superior · 64 bits</p></section>
-<section aria-label="Números da plataforma" class="stats"><article><strong id="accounts">—</strong><span>Contas cadastradas</span></article><article><strong id="groups">—</strong><span>Grupos ativos</span></article><article><strong id="alarms">—</strong><span>Alarmes no servidor</span></article></section><p id="updated" class="detail" role="status"></p>
-<section class="features"><div><h2>Funciona no seu computador</h2><p>Os alarmes em cache continuam sendo disparados localmente, mesmo sem conexão com a API.</p></div><div><h2>Uma conta, seus lembretes</h2><p>Entre com sua conta para sincronizar seus alarmes e participar dos grupos da sua equipe.</p></div></section><footer>Team Reminder · Estatísticas agregadas, sem dados pessoais.</footer></main></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Team Reminder: alarmes e lembretes para Windows, sincronizados entre computadores e compartilhados com a sua equipe.">
+<meta name="color-scheme" content="light dark">
+<title>Team Reminder · Alarmes para você e sua equipe</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/portal.css">
+<script src="/portal.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="" width="28" height="28">Team Reminder</a>
+    <nav aria-label="Seções"><a href="#recursos">Recursos</a><a href="#instalar">Como instalar</a></nav>
+    <span id="api" class="status" role="status"><span class="dot"></span><span id="api-text">Verificando API…</span></span>
+  </div>
+</header>
+
+<main>
+  <section class="wrap hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Alarmes para Windows</p>
+      <h1>Nunca mais perca a daily, a pausa ou o ponto.</h1>
+      <p class="lead">Crie alarmes que ficam na tela até você agir, adie por alguns minutos com um clique e compartilhe lembretes com a sua equipe. Tudo toca no seu computador, mesmo sem internet.</p>
+      <div class="cta">
+        <a id="download" class="button primary" hidden href="/download/windows">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11m0 0-4-4m4 4 4-4M5 17v2h14v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Baixar para Windows
+        </a>
+        <a class="button ghost" href="#recursos">Conhecer recursos</a>
+      </div>
+      <p id="release" class="detail" role="status">Consultando a versão do aplicativo…</p>
+      <p class="detail">Windows 10 (versão 2004) ou superior · 64 bits · Gratuito</p>
+    </div>
+
+    <!-- Illustration of the app: built with HTML and CSS, hidden from assistive technology. -->
+    <div class="mock" aria-hidden="true">
+      <div class="window">
+        <div class="titlebar"><img src="/favicon.svg" alt="" width="14" height="14"><span>Team Reminder</span><i></i><i></i><i></i></div>
+        <div class="window-body">
+          <div class="side"><b class="active"></b><b></b><b></b><b class="bottom"></b></div>
+          <div class="content">
+            <p class="greet">Bom dia, Ana</p>
+            <div class="next">
+              <small>PRÓXIMO ALARME</small>
+              <div class="next-time"><strong>09:30</strong><span>Hoje<br><em>Em 25 min</em></span></div>
+              <p>Daily da equipe</p>
+              <span class="pill">Abrir reunião</span>
+            </div>
+            <div class="row"><strong>12:00</strong><span>Almoço<em>Todos os dias</em></span></div>
+            <div class="row"><strong>18:00</strong><span>Registrar o ponto<em>Dias úteis</em></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="toast">
+        <div class="toast-head"><img src="/favicon.svg" alt="" width="14" height="14">Team Reminder</div>
+        <p><b>Daily da equipe</b><br>Hora do alarme · 09:30</p>
+        <div class="toast-select">5 minutos</div>
+        <div class="toast-actions"><span>Adiar</span><span>Abrir reunião</span><span>Dispensar</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap stats" aria-label="Números da plataforma">
+    <article><strong id="accounts">—</strong><span>Contas cadastradas</span></article>
+    <article><strong id="groups">—</strong><span>Grupos ativos</span></article>
+    <article><strong id="alarms">—</strong><span>Alarmes no servidor</span></article>
+  </section>
+  <p id="updated" class="wrap detail center" role="status"></p>
+
+  <section id="recursos" class="wrap features">
+    <h2>Feito para não deixar passar</h2>
+    <div class="grid">
+      <article><span class="icon">⏰</span><h3>Avisos que não somem</h3><p>A notificação fica na tela até você adiar por 5, 10 ou 15 minutos ou dispensar. O adiamento vale mesmo se o computador reiniciar.</p></article>
+      <article><span class="icon">📴</span><h3>Funciona sem internet</h3><p>Os alarmes ficam no seu computador e tocam no horário certo, com ou sem conexão com o servidor.</p></article>
+      <article><span class="icon">👥</span><h3>Alarmes da equipe</h3><p>Crie um grupo, convide colegas e publique um lembrete que toca para todos no mesmo instante.</p></article>
+      <article><span class="icon">🔄</span><h3>Sincronizado entre computadores</h3><p>Entre com a sua conta e seus alarmes pessoais acompanham você no notebook e no desktop.</p></article>
+      <article><span class="icon">🔗</span><h3>Link direto da reunião</h3><p>Adicione o endereço da chamada ou do sistema de ponto e abra tudo com um clique na própria notificação.</p></article>
+      <article><span class="icon">🛡️</span><h3>Sempre atualizado</h3><p>Novas versões são baixadas, conferidas pelo SHA-256 publicado e instaladas quando nenhum alarme está próximo.</p></article>
+    </div>
+  </section>
+
+  <section id="instalar" class="wrap install">
+    <h2>Como instalar</h2>
+    <ol class="steps">
+      <li><b>Baixe o instalador</b><span>Use o botão acima. A instalação é por usuário e não pede senha de administrador.</span></li>
+      <li><b>Confirme no Windows</b><span>O instalador ainda não tem assinatura digital. Se o SmartScreen avisar, clique em <em>Mais informações</em> e depois em <em>Executar assim mesmo</em>.</span></li>
+      <li><b>Crie seu primeiro alarme</b><span>O app fica na bandeja do relógio. Entre com uma conta para sincronizar e participar de grupos.</span></li>
+    </ol>
+    <div id="checksum" class="checksum" hidden>
+      <div>
+        <b>Conferir o arquivo (opcional)</b>
+        <span>No PowerShell: <code>Get-FileHash .\TeamReminder-Setup-*.exe</code> deve mostrar:</span>
+        <code id="sha" class="sha"></code>
+      </div>
+      <button id="copy-sha" class="button ghost small" type="button">Copiar</button>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap footer">
+  <span>Team Reminder · Estatísticas agregadas, sem dados pessoais.</span>
+  <a href="/admin/">Administração</a>
+</footer>
+</body>
+</html>
