@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -36,6 +37,15 @@ builder.Services.AddRateLimiter(o =>
         _ => new FixedWindowRateLimiterOptions { PermitLimit = builder.Configuration.GetValue<int?>("Auth:RequestsPerMinute") ?? 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 16 * 1024);
+// Behind a hosting proxy (Render), the connection IP is the proxy's; rate limits must use the forwarded client IP.
+// Enable only when the container is reachable exclusively through that proxy, otherwise clients could spoof it.
+builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((o, config) =>
+{
+    if (!config.GetValue<bool>("ForwardedHeaders:Enabled")) return;
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+});
 var app = builder.Build();
 var connection = app.Configuration.GetConnectionString("Database")
     ?? throw new InvalidOperationException("Configure ConnectionStrings__Database.");
@@ -52,6 +62,7 @@ if (args.Contains("--bootstrap-admin"))
     return;
 }
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.Use(async (context, next) =>
 {

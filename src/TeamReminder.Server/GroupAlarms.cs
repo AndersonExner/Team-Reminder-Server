@@ -54,7 +54,8 @@ public static class GroupAlarmEndpoints
         if((alarm?.Version??0)!=request.ExpectedVersion)return Results.Conflict(new{message="O alarme do grupo foi alterado. Sincronize e tente novamente."});
         if(alarm is null){
             if(request.Deleted)return Results.NotFound();
-            if(await db.GroupAlarms.CountAsync(x=>x.GroupId==groupId,ct)>=100)return Results.Json(new{message="Limite de 100 registros de alarmes por grupo, incluindo exclusões."},statusCode:422);
+            if(await db.GroupAlarms.CountAsync(x=>x.GroupId==groupId,ct)>=10_000)return Results.Json(new{message="Limite de registros do grupo atingido, incluindo exclusões."},statusCode:422);
+            if(await db.GroupAlarms.CountAsync(x=>x.GroupId==groupId&&!x.Deleted,ct)>=100)return Results.Json(new{message="Limite de 100 alarmes ativos por grupo atingido."},statusCode:422);
             if(await db.PersonalAlarms.AnyAsync(x=>x.Id==id,ct))return Results.Conflict(new{message="Identificador já utilizado."});
             alarm=new(){Id=id,GroupId=groupId,CreatedByAccountId=actor};db.GroupAlarms.Add(alarm);
         }
